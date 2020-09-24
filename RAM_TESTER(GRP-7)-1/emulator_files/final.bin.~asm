@@ -1,0 +1,267 @@
+
+
+#LOAD_SEGMENT=FFFFh#
+#LOAD_OFFSET=0000h#
+
+#CS=0000h#
+#IP=0000h#
+
+#DS=0000h#
+#ES=0000h#
+
+#SS=0000h#
+#SP=FFFEh#
+
+#AX=0000h#
+#BX=0000h#
+#CX=0000h#
+#DX=0000h#
+#SI=0000h#
+#DI=0000h#
+#BP=0000h#
+; this header has to remain
+; add your code here
+jmp     st1
+;proteus allows you to change the reset address - hence changing it to 00000H - so every time
+;system is reset it will go and execute the instruction at address 00000H - which is jmp st1
+db     1021 dup(0)
+;jmp st1 will take up 3 bytes in memory - another 509 bytes are filled with '0s'
+;1021 + 3 bytes = 1024 bytes
+;first 1 k of memory is IVT - 00000 -00002H will now have the jmp instruction. 00003H - 001FFH will
+;have 00000 - as vector number 0 to 79H are unused
+;IVT entry for 80H - address for entry is 80H x 4 is 00200H
+;code segment will be in ROM
+st1:      cli
+; intialize ds, es,ss to start of RAM - that is 020000H - as you need r/w capability for DS,ES & SS
+; pl note you cannot use db to store data in the RAM you have to use a MOV instruction.
+; so if you want to do dat1 db 78H - you have to say something like
+; dat1 equ 0002h
+; mov al,78h
+; mov dat1,al
+;0002H is the offset in data segmnet where you are storing the data.
+;db can be used only to store data in code segment
+mov       ax,01000h
+mov       ds,ax
+mov       es,ax
+mov       ss,ax
+mov       sp,0FFFEH
+
+; intialise portA as input portB,portC as output for the first 8255
+mov       al,90h      ;1st
+out     06h,al
+
+;Keep polling port A until you get 1 from the switch
+POLLING :     in        al,00h
+mov       bl,01h
+cmp       bl,al
+jnz POLLING
+
+TRUE:
+
+; initialize portA,B as output and port C isnt connected
+mov       al,10000000b       ;2nd
+out       0Eh,al
+
+
+mov dx,00h
+
+START:
+mov ch,11111110b
+mov bh,00000001b
+
+
+mov cl,08
+
+;for reading and writing 0's
+START1:
+mov al,dl
+out 08h,al
+mov al,dh
+and al,10111111b      ;Turn on write enable
+or  al,00100000b      ;Turn off read enable!
+and  al,01111111b     ;Turn on CE!
+
+out 0Ah,al
+
+mov       al,10010010b    ;Initialize 3rd 8255 to write data ;So port C in output mode
+out       16h,al
+
+mov al,ch    ; Write from Port C of 3rd 8255
+out 14h,al
+
+
+mov al,dh
+and al,11011111b      ;Turn on read enable!
+or  al,01000000b      ;Turn off write enable dash!
+and  al,01111111b     ;Turn on CE!
+out 0Ah,al
+
+
+
+mov       al,10011011b    ;Initialize 3rd 8255 to read data : So port C in input mode
+out       16h,al
+
+in al,14h
+
+mov bl,ch
+cmp al,bl
+jnz FAIL
+
+;for reading and writing 1's
+
+mov al,dl
+out 08h,al
+
+mov al,dh
+and al,10111111b      ;Turn on write enable dash!
+or  al,00100000b      ;Turn off read enable!
+and  al,01111111b     ;Turn on CE!
+
+out 0Ah,al
+
+mov       al,10010010b    ;Initialize 3rd 8255 to write data ;So port C in output mode
+out       16h,al
+
+mov al,bh     ; Write from Port C of 3rd 8255
+out 14h,al
+
+
+mov al,dh
+and al,11011111b      ;Turn on read enable!
+or  al,01000000b      ;Turn off write enable dash!
+and  al,01111111b     ;Turn on CE!
+out 0Ah,al
+
+
+
+mov       al,10011011b    ;Initialize 3rd 8255 to read data : So port C in input mode
+out       16h,al
+
+in al,14h
+
+mov bl,bh
+cmp al,bl
+jnz FAIL
+
+
+
+
+
+ROL ch,1
+ROL bh,1
+
+dec cl
+jnz START1
+inc dx
+cmp dx,8192d
+jz PASS
+jmp  START
+
+
+
+;Fail on LED
+
+
+FAIL:     mov al,0FFh
+out 04,al
+
+
+mov al,01h
+out 02h,al
+
+mov al,8eh        ;For F
+out 04h,al
+
+mov al,02h
+out 02h,al
+
+mov al,88h        ;For a
+out 04h,al
+
+
+mov al,00
+out 02h,al
+
+mov al,0ffh
+out 04h,al
+
+mov al,04h
+out 02h,al
+
+
+mov al,0F9h        ;For I
+out 04h,al
+
+
+mov al,08h
+out 02h,al
+
+mov al,0c7h        ;For L
+out 04h,al
+
+mov al,00
+out 02h,al
+
+mov al,0ffh
+out 04h,al
+;this for the recurssion of the program
+in        al,00h
+mov       bl,01h
+cmp       bl,al
+jz TRUE
+
+
+jmp FAIL
+
+;Pass on LED
+
+
+
+PASS:       mov al,0FFh
+out 04,al
+
+
+mov al,01h
+out 02h,al
+
+mov al,8ch       ;For P
+out 04,al
+
+mov al,02h
+out 02h,al
+
+mov al,88h        ;For A
+out 04,al
+
+mov al,04h
+out 02h,al
+
+mov al,92h        ;for S
+out 04,al
+
+
+mov al,08h
+out 02h,al
+
+mov al,92h        ;for S
+out 04,al
+
+mov al,00
+out 02h,al
+
+mov al,0ffh
+out 04h,al
+;this for the recurssion of the program
+in        al,00h
+mov       bl,01h
+cmp       bl,al
+jz TRUE
+
+
+jmp PASS
+
+
+
+
+
+
